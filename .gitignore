@@ -1,0 +1,61 @@
+# Dependencies
+node_modules/
+
+# Environment variables (NEVER commit secrets!)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# IDE/Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*~
+.project
+.settings/
+
+# Build outputs
+dist/
+build/
+*.tgz
+
+# Claude Code local files
+.claude/
+
+# Runtime files
+.glmproxy.pid
+
+# Development artifacts
+prompts/
+research/
+
+# Internal documentation
+CLAUDE.md
+**/CLAUDE.md
+
+# Screenshots and temp files
+*.png
+*.jpg
+*.jpeg
+*.gif
+!public/**/*.png
+!public/**/*.jpg

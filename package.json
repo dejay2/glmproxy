@@ -1,0 +1,42 @@
+{
+  "name": "glm-enhanced-proxy",
+  "version": "1.0.0",
+  "description": "HTTP proxy that transforms Anthropic Messages API requests to Z.ai GLM-4.6 API format with thinking/reasoning, tool execution, and streaming support",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "ccglm": "src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "LOG_LEVEL=error node --test 'src/*.test.js' 'src/**/*.test.js'"
+  },
+  "keywords": [
+    "llm",
+    "proxy",
+    "anthropic",
+    "glm",
+    "openai",
+    "claude",
+    "z.ai",
+    "mcp",
+    "api-proxy"
+  ],
+  "author": "SIS LTD",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dejay2/glmproxy"
+  },
+  "files": [
+    "src/**/*.js",
+    "README.md"
+  ],
+  "dependencies": {
+    "dotenv": "^17.2.3"
+  }
+}

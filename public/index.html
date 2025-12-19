@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GLM Enhanced Proxy Dashboard</title>
+  <link rel="stylesheet" href="/dashboard/css/styles.css">
+</head>
+<body>
+  <div class="app" data-theme="light">
+    <aside class="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">GLM Proxy</h1>
+        <span class="sidebar__version" data-version>v1.0.0</span>
+      </div>
+
+      <nav class="nav" role="navigation">
+        <button class="nav__item nav__item--active" data-tab="settings" aria-label="Settings">
+          <span class="nav__icon">Settings</span>
+          <span class="nav__label">Settings</span>
+        </button>
+        <button class="nav__item" data-tab="mcp" aria-label="MCP Servers">
+          <span class="nav__icon">MCP</span>
+          <span class="nav__label">MCP Servers</span>
+        </button>
+      </nav>
+
+      <div class="sidebar__footer">
+        <button class="btn btn--icon" data-action="toggle-theme" aria-label="Toggle theme">
+          <span class="theme-icon" data-theme-icon>🌙</span>
+        </button>
+        <div class="status" data-status>
+          <span class="status__indicator" data-status-indicator></span>
+          <span class="status__text" data-status-text>Connecting...</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- Settings Panel -->
+      <div class="panel panel--active" data-panel="settings">
+        <header class="header">
+          <h2 class="header__title">Settings</h2>
+          <div class="header__actions">
+            <button class="btn btn--primary btn--sm" data-action="save-settings">
+              <span>💾</span> Save Settings
+            </button>
+          </div>
+        </header>
+
+        <div class="content">
+          <div class="settings">
+            <section class="card">
+              <h3 class="card__title">API Configuration</h3>
+              <div class="form-group">
+                <label class="label" for="api-key">Z.ai API Key</label>
+                <div class="input-with-button">
+                  <input
+                    type="password"
+                    id="api-key"
+                    class="input"
+                    data-api-key
+                    placeholder="Enter your Z.ai API key"
+                  >
+                  <button class="btn btn--icon" data-action="toggle-api-key" aria-label="Show/hide API key">
+                    <span data-eye-icon>👁️</span>
+                  </button>
+                </div>
+                <small class="form-hint">Your API key is stored locally and never sent to our servers</small>
+              </div>
+            </section>
+
+            <section class="card">
+              <h3 class="card__title">Server Information</h3>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-item__label">Server URL</span>
+                  <span class="info-item__value" data-server-url>http://127.0.0.1:4567</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-item__label">Text Model</span>
+                  <span class="info-item__value" data-text-model>glm-4.6</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-item__label">Vision Model</span>
+                  <span class="info-item__value" data-vision-model>glm-4.6v</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-item__label">Uptime</span>
+                  <span class="info-item__value" data-uptime>-</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <h3 class="card__title">Endpoint Selection</h3>
+              <div class="form-group">
+                <label class="label" for="endpoint-mode">API Endpoint</label>
+                <select id="endpoint-mode" class="select" data-select="endpoint-mode">
+                  <option value="anthropic" selected>Anthropic (Z.ai) - fast, buffered responses</option>
+                  <option value="openai">OpenAI (Z.ai) - real-time streaming</option>
+                  <option value="bigmodel">OpenAI (BigModel) - alternative provider</option>
+                </select>
+                <small class="form-hint">Controls which upstream API endpoint is used for requests</small>
+              </div>
+            </section>
+
+            <section class="card">
+              <h3 class="card__title">Features</h3>
+              <div class="form-group">
+                <div class="toggle-group">
+                  <label class="toggle-label">
+                    <div class="toggle">
+                      <input type="checkbox" class="toggle__input" data-toggle="force-reasoning" checked>
+                      <span class="toggle__slider"></span>
+                    </div>
+                    <div class="toggle-label__text">
+                      <span class="toggle-label__title">Force Reasoning</span>
+                      <span class="toggle-label__description">Inject reasoning prompt to encourage step-by-step thinking</span>
+                    </div>
+                  </label>
+
+                  <label class="toggle-label">
+                    <div class="toggle">
+                      <input type="checkbox" class="toggle__input" data-toggle="web-search" checked>
+                      <span class="toggle__slider"></span>
+                    </div>
+                    <div class="toggle-label__text">
+                      <span class="toggle-label__title">Enable Web Search</span>
+                      <span class="toggle-label__description">Allow model to search the web via MCP</span>
+                    </div>
+                  </label>
+
+                  <label class="toggle-label">
+                    <div class="toggle">
+                      <input type="checkbox" class="toggle__input" data-toggle="web-read" checked>
+                      <span class="toggle__slider"></span>
+                    </div>
+                    <div class="toggle-label__text">
+                      <span class="toggle-label__title">Enable Web Reader</span>
+                      <span class="toggle-label__description">Allow model to read web pages via MCP</span>
+                    </div>
+                  </label>
+
+                  <label class="toggle-label">
+                    <div class="toggle">
+                      <input type="checkbox" class="toggle__input" data-toggle="streaming">
+                      <span class="toggle__slider"></span>
+                    </div>
+                    <div class="toggle-label__text">
+                      <span class="toggle-label__title">Enable Streaming</span>
+                      <span class="toggle-label__description">Stream responses in real-time (SSE)</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- MCP Panel -->
+      <div class="panel" data-panel="mcp">
+        <header class="header">
+          <h2 class="header__title">MCP Servers</h2>
+          <div class="header__actions">
+            <button class="btn btn--primary btn--sm" data-action="add-mcp">
+              <span>+</span> Add MCP
+            </button>
+          </div>
+        </header>
+
+        <div class="content">
+          <div class="mcp-manager">
+            <p class="form-hint">
+              Configure custom MCP (Model Context Protocol) servers. Each MCP can provide tools that are automatically injected when trigger keywords are detected in your messages.
+            </p>
+
+            <div class="mcp-list" data-mcp-list>
+              <p class="mcp-loading">Loading MCPs...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- MCP Modal -->
+    <div class="modal" data-mcp-modal>
+      <div class="modal__content">
+        <div class="modal__header">
+          <h3 class="modal__title" data-modal-title>Add MCP Server</h3>
+          <button class="btn btn--icon" data-action="close-modal" aria-label="Close">
+            <span>X</span>
+          </button>
+        </div>
+
+        <form class="modal__body" data-mcp-form>
+          <div class="form-group">
+            <label class="label" for="mcp-id">ID</label>
+            <input type="text" id="mcp-id" name="mcp-id" class="input" placeholder="unique-id" required>
+            <small class="form-hint">Unique identifier (lowercase, no spaces)</small>
+          </div>
+
+          <div class="form-group">
+            <label class="label" for="mcp-name">Name</label>
+            <input type="text" id="mcp-name" name="mcp-name" class="input" placeholder="My MCP Server" required>
+          </div>
+
+          <div class="form-group">
+            <label class="label" for="mcp-command">Command</label>
+            <input type="text" id="mcp-command" name="mcp-command" class="input" value="npx" required>
+            <small class="form-hint">Allowed: npx, node, python, python3</small>
+          </div>
+
+          <div class="form-group">
+            <label class="label" for="mcp-args">Arguments</label>
+            <input type="text" id="mcp-args" name="mcp-args" class="input" placeholder="@example/mcp@latest">
+            <small class="form-hint">Space-separated command arguments</small>
+          </div>
+
+          <div class="form-group">
+            <label class="label" for="mcp-triggers">Trigger Keywords</label>
+            <textarea id="mcp-triggers" name="mcp-triggers" class="textarea" rows="3" placeholder="use example&#10;example automation"></textarea>
+            <small class="form-hint">One trigger per line. MCP tools are injected when these phrases appear in your message.</small>
+          </div>
+
+          <div class="form-group">
+            <label class="label" for="mcp-api-key">API Key (optional)</label>
+            <input type="password" id="mcp-api-key" name="mcp-api-key" class="input" placeholder="Enter API key">
+            <small class="form-hint" data-api-key-hint>Leave blank if not required. Key is saved securely to .env file.</small>
+          </div>
+
+          <div class="form-group">
+            <label class="toggle-label">
+              <div class="toggle">
+                <input type="checkbox" class="toggle__input" name="mcp-api-key-as-arg">
+                <span class="toggle__slider"></span>
+              </div>
+              <div class="toggle-label__text">
+                <span class="toggle-label__title">Pass API Key as Argument</span>
+                <span class="toggle-label__description">Use --api-key instead of environment variable</span>
+              </div>
+            </label>
+          </div>
+        </form>
+
+        <div class="modal__footer">
+          <button class="btn btn--secondary" data-action="cancel-mcp">Cancel</button>
+          <button class="btn btn--primary" data-action="save-mcp">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" data-toast-container></div>
+
+  <script type="module" src="/dashboard/js/app.js"></script>
+</body>
+</html>
