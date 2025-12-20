@@ -219,14 +219,22 @@ async function launchClaudeCode(args = [], skipPermissions = false) {
   }
 
   // Spawn claude with proxy environment
-  const child = spawn('claude', claudeArgs, {
+  const spawnOptions = {
     stdio: 'inherit',
     env: {
       ...process.env,
       ANTHROPIC_BASE_URL: proxyUrl,
       ...CLAUDE_ENV,
     },
-  });
+  };
+
+  let child;
+  if (process.platform === 'win32') {
+    spawnOptions.shell = true;
+    child = spawn('claude', claudeArgs, spawnOptions);
+  } else {
+    child = spawn('claude', claudeArgs, spawnOptions);
+  }
 
   child.on('error', (err) => {
     if (err.code === 'ENOENT') {
