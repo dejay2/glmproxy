@@ -1,6 +1,6 @@
 /**
  * Reasoning Prompt Injector
- * Injects explicit reasoning instructions to force GLM-4.6 to think step-by-step
+ * Injects explicit reasoning instructions to force GLM-4.7 to think step-by-step
  */
 
 import logger from '../utils/logger.js';

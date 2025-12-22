@@ -2,7 +2,7 @@
  * Model Router: Intelligent model selection based on request content
  *
  * Detects images in messages and routes to appropriate model:
- * - glm-4.6: Text-only requests (faster, cheaper)
+ * - glm-4.7: Text-only requests (faster, cheaper)
  * - glm-4.6v: Vision-capable requests (handles images)
  */
 

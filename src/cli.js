@@ -24,7 +24,7 @@ const __dirname = dirname(__filename);
 // Configuration
 const DEFAULT_PORT = process.env.PORT || 4567;
 const DEFAULT_HOST = process.env.HOST || '127.0.0.1';
-const DEFAULT_MODEL = process.env.GLM_MODEL || 'glm-4.6';
+const DEFAULT_MODEL = process.env.GLM_MODEL || 'glm-4.7';
 const PID_FILE = join(__dirname, '..', '.glmproxy.pid');
 
 // Claude Code environment overrides

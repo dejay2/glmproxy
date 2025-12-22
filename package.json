@@ -1,7 +1,7 @@
 {
   "name": "glm-enhanced-proxy",
   "version": "1.0.0",
-  "description": "HTTP proxy that transforms Anthropic Messages API requests to Z.ai GLM-4.6 API format with thinking/reasoning, tool execution, and streaming support",
+  "description": "HTTP proxy that transforms Anthropic Messages API requests to Z.ai GLM-4.7 API format with thinking/reasoning, tool execution, and streaming support",
   "type": "module",
   "main": "src/index.js",
   "bin": {

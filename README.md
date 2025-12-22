@@ -1,12 +1,12 @@
 # GLM Enhanced Proxy
 
-HTTP proxy server that transforms [Anthropic Messages API](https://docs.anthropic.com/claude/reference/messages) requests to [Z.ai GLM-4.6 API](https://api.z.ai) format, enabling Claude-compatible tools and applications to use GLM models.
+HTTP proxy server that transforms [Anthropic Messages API](https://docs.anthropic.com/claude/reference/messages) requests to [Z.ai GLM-4.7 API](https://api.z.ai) format, enabling Claude-compatible tools and applications to use GLM models.
 
 ## Why GLMProxy?
 
-### The Problem with GLM-4.6
+### The Problem with GLM-4.7
 
-GLM-4.6 is a powerful model, but it has limitations when used directly:
+GLM-4.7 is a powerful model, but it has limitations when used directly:
 
 | Limitation | Impact |
 |------------|--------|
@@ -22,7 +22,7 @@ GLM-4.6 is a powerful model, but it has limitations when used directly:
 |---------|----------|
 | No web search | MCP `web_search`/`web_reader` injection; intercepts Claude Code's native WebSearch/WebFetch |
 | No reasoning | Automatic reasoning prompt injection with `<reasoning_content>` parsing to thinking blocks |
-| Manual model switching | Auto-detects images/video in current message → routes to glm-4.6v, switches back for text |
+| Manual model switching | Auto-detects images/video in current message → routes to glm-4.6v, switches back to glm-4.7 for text |
 | Limited tools | Dynamic MCP registry - add Playwright, Context7, or any MCP server via dashboard |
 | Complex integration | Drop-in Anthropic API compatibility - works with any tool that supports custom base URLs |
 
@@ -39,7 +39,7 @@ GLM-4.6 is a powerful model, but it has limitations when used directly:
 - **Web Dashboard**: Settings panel and MCP management (vanilla JS, no dependencies)
 - **Smart Backend Routing**: Automatically routes text requests via Anthropic endpoint and vision requests via OpenAI endpoint for optimal results
 - **API Translation**: Transparent conversion between Anthropic Messages API and OpenAI-compatible GLM API
-- **Intelligent Model Selection**: Automatic selection of text (glm-4.6) or vision (glm-4.6v) models based on current message content
+- **Intelligent Model Selection**: Automatic selection of text (glm-4.7) or vision (glm-4.6v) models based on current message content
 - **Video Analysis**: Full video support with automatic file path detection - just mention a video file and it's analyzed
 - **Reasoning Injection**: Automatic reasoning prompt injection for step-by-step thinking with `<reasoning_content>` tag parsing
 - **Tool Execution**: Internal tool loop for web_search and web_reader via Z.ai MCP servers, plus automatic interception of Claude Code's native WebSearch/WebFetch tools
@@ -301,7 +301,7 @@ Anthropic Messages API compatible endpoint.
   "content": [
     {"type": "text", "text": "Hello! How can I help you?"}
   ],
-  "model": "glm-4.6",
+  "model": "glm-4.7",
   "stop_reason": "end_turn",
   "usage": {
     "input_tokens": 10,
@@ -323,7 +323,7 @@ Health check endpoint with status and configuration.
   "config": {
     "toolsEnabled": true,
     "streamingEnabled": false,
-    "models": ["glm-4.6", "glm-4.6v"]
+    "models": ["glm-4.7", "glm-4.6v"]
   },
   "validation": {
     "isValid": true,
@@ -343,7 +343,7 @@ Detailed configuration endpoint (for debugging).
   "host": "127.0.0.1",
   "apiKeyConfigured": true,
   "models": {
-    "text": "glm-4.6",
+    "text": "glm-4.7",
     "vision": "glm-4.6v"
   },
   "toolExecution": {
@@ -388,7 +388,7 @@ The proxy supports two backend paths to Z.ai with intelligent routing:
 
 The proxy automatically selects the best endpoint based on content:
 
-- **Text-only requests** → Anthropic endpoint (glm-4.6) - faster, native format
+- **Text-only requests** → Anthropic endpoint (glm-4.7) - faster, native format
 - **Vision requests** → OpenAI endpoint (glm-4.6v) - full image analysis
 
 This avoids Z.ai's `server_tool_use` interception on the Anthropic endpoint which truncates image analysis results.
@@ -418,10 +418,10 @@ Toggle the Anthropic endpoint:
 
 The proxy automatically selects the appropriate GLM model based on the **current message**:
 
-- **glm-4.6**: Used for text-only messages (via Anthropic endpoint)
+- **glm-4.7**: Used for text-only messages (via Anthropic endpoint)
 - **glm-4.6v**: Used when the current message contains images or videos (via OpenAI endpoint)
 
-After processing an image or video, subsequent text-only messages automatically switch back to glm-4.6 for faster responses. Previous media in conversation history don't force the vision model.
+After processing an image or video, subsequent text-only messages automatically switch back to glm-4.7 for faster responses. Previous media in conversation history don't force the vision model.
 
 Media detection scans for:
 - Direct image/video content blocks
@@ -430,7 +430,7 @@ Media detection scans for:
 
 ### Video Analysis
 
-GLM-4.6V supports video analysis with up to ~1 hour of video content (128K context). The proxy makes video analysis seamless:
+GLM-4.6v supports video analysis with up to ~1 hour of video content (128K context). The proxy makes video analysis seamless:
 
 #### Automatic File Path Detection (Claude Code)
 
@@ -650,7 +650,7 @@ You've hit the rate limit. Wait and retry, or upgrade your Z.ai plan.
 
 ### Requests are slow
 
-GLM-4.6 can take 10-30 seconds for complex requests. For faster responses:
+GLM-4.7 can take 10-30 seconds for complex requests. For faster responses:
 - Use shorter prompts
 - Reduce `max_tokens`
 
@@ -660,7 +660,7 @@ This should be fixed automatically - the proxy routes vision requests through th
 
 ### Model stays on glm-4.6v after image
 
-The proxy now only checks the current message for images. After an image request, subsequent text-only messages will automatically use glm-4.6. You don't need to start a new conversation.
+The proxy now only checks the current message for images. After an image request, subsequent text-only messages will automatically use glm-4.7. You don't need to start a new conversation.
 
 ### Debug logging
 

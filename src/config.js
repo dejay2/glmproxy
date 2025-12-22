@@ -70,12 +70,12 @@ const config = {
   },
 
   // Model configuration
-  defaultModel: 'glm-4.6',
+  defaultModel: 'glm-4.7',
   visionModel: 'glm-4.6v',
 
   // Models object for routing
   models: {
-    text: 'glm-4.6',
+    text: 'glm-4.7',
     vision: 'glm-4.6v',
   },
 

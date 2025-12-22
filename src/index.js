@@ -2,7 +2,7 @@
  * GLM Enhanced Proxy - Entry Point
  *
  * HTTP proxy server that transforms Anthropic Messages API requests
- * to Z.ai GLM-4.6 API format.
+ * to Z.ai GLM-4.7 API format.
  */
 
 import 'dotenv/config';

@@ -61,7 +61,7 @@ export function transformResponse(glmResponse, requestedModel) {
   // Build content array
   const content = [];
 
-  // Check for native reasoning_content field (GLM-4.6 thinking mode)
+  // Check for native reasoning_content field (GLM-4.7 thinking mode)
   if (message.reasoning_content) {
     content.push({
       type: 'thinking',
@@ -138,7 +138,7 @@ export function transformResponse(glmResponse, requestedModel) {
     type: 'message',
     role: 'assistant',
     content,
-    model: glmResponse.model || 'glm-4.6-enhanced',
+    model: glmResponse.model || 'glm-4.7-enhanced',
     stop_reason: stopReason,
     stop_sequence: null,
     usage: {

@@ -158,7 +158,7 @@ class SettingsManager {
 
       const textModel = $('[data-text-model]');
       if (textModel) {
-        textModel.textContent = config.models?.text || 'glm-4.6';
+        textModel.textContent = config.models?.text || 'glm-4.7';
       }
 
       const visionModel = $('[data-vision-model]');
