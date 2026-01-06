@@ -224,7 +224,7 @@ When you run `ccglm`, it:
 2. Sets environment variables to route Claude Code through the proxy:
    - `ANTHROPIC_BASE_URL` → proxy URL
    - `ANTHROPIC_AUTH_TOKEN` → dummy token (proxy uses your ZAI_API_KEY)
-   - `ANTHROPIC_DEFAULT_*_MODEL` → glm4.6 for all model tiers
+   - `ANTHROPIC_DEFAULT_*_MODEL` → `glm-4.7` for all model tiers
 3. Launches Claude Code
 
 Use `ccglm yolo` to skip permission prompts.
