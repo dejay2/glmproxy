@@ -177,6 +177,37 @@ export class ToolExecutionError extends ProxyError {
 }
 
 /**
+ * Context window limit error
+ * Thrown when the upstream API indicates the context window has been exceeded
+ */
+export class ContextLimitError extends ProxyError {
+  /**
+   * @param {string} message - Error message
+   */
+  constructor(message = 'The model has reached its context window limit.') {
+    super(message, 'invalid_request_error', 400);
+    this.name = 'ContextLimitError';
+    this.suggestCompact = true;
+  }
+
+  /**
+   * Convert to Anthropic error response format with compact suggestion
+   * @returns {Object} Anthropic error response
+   */
+  toAnthropicError() {
+    return {
+      type: 'error',
+      error: {
+        type: this.type,
+        message: this.message,
+        // Add hint that client should trigger compaction
+        suggest_compact: true,
+      },
+    };
+  }
+}
+
+/**
  * Convert any error to Anthropic error response format
  * @param {Error} error - Any error object
  * @returns {Object} Anthropic error response
@@ -208,6 +239,21 @@ export function getErrorStatus(error) {
   return 500;
 }
 
+/**
+ * Check if an error message indicates a context window limit error
+ * @param {string} message - Error message to check
+ * @returns {boolean} True if the error is about context window limits
+ */
+export function isContextLimitError(message) {
+  const lowerMessage = message.toLowerCase();
+  return (
+    lowerMessage.includes('context') &&
+    (lowerMessage.includes('limit') || lowerMessage.includes('exceed') || lowerMessage.includes('window'))
+  ) ||
+  lowerMessage.includes('tokens') && lowerMessage.includes('exceed') ||
+  lowerMessage.includes('maximum') && lowerMessage.includes('tokens');
+}
+
 export default {
   ProxyError,
   InvalidRequestError,
@@ -219,6 +265,8 @@ export default {
   McpError,
   TransformError,
   ToolExecutionError,
+  ContextLimitError,
   toAnthropicError,
   getErrorStatus,
+  isContextLimitError,
 };
