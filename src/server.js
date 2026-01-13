@@ -27,8 +27,10 @@ import {
   ProxyError,
   InvalidRequestError,
   GlmApiError,
+  ContextLimitError,
   toAnthropicError,
   getErrorStatus,
+  isContextLimitError,
 } from './utils/errors.js';
 import {
   initRegistry,
@@ -282,6 +284,13 @@ async function callGLMApi(glmRequest) {
       statusText: response.statusText,
       body: errorText.substring(0, 500),
     });
+
+    // Check if this is a context window limit error
+    const fullErrorMessage = `${response.status} ${response.statusText} ${errorText}`;
+    if (isContextLimitError(fullErrorMessage)) {
+      throw new ContextLimitError(`The model has reached its context window limit. Please compact the conversation to continue.`);
+    }
+
     throw new GlmApiError(
       `GLM API error: ${response.status} ${response.statusText}`,
       response.status,
@@ -364,6 +373,13 @@ async function callAnthropicApi(anthropicRequest) {
       statusText: response.statusText,
       body: errorText.substring(0, 500),
     });
+
+    // Check if this is a context window limit error
+    const fullErrorMessage = `${response.status} ${response.statusText} ${errorText}`;
+    if (isContextLimitError(fullErrorMessage)) {
+      throw new ContextLimitError(`The model has reached its context window limit. Please compact the conversation to continue.`);
+    }
+
     throw new GlmApiError(
       `Anthropic API error: ${response.status} ${response.statusText}`,
       response.status,
@@ -422,7 +438,118 @@ function handleTrafficSSE(req, res) {
 }
 
 /**
- * Handle POST /v1/messages endpoint
+ * Summarize conversation messages
+ * @param {Array} messages - Messages to summarize
+ * @param {string} model - Model to use for summarization
+ * @param {string} endpoint - Endpoint to use ('anthropic', 'openai', 'bigmodel')
+ * @returns {Promise<string>} Summary of the conversation
+ */
+async function summarizeConversation(messages, model, endpoint) {
+  // Create a structured summary prompt based on Anthropic SDK's approach
+  const conversationText = messages.map(m => {
+    const role = m.role;
+    let content = '';
+    if (typeof m.content === 'string') {
+      content = m.content;
+    } else if (Array.isArray(m.content)) {
+      content = m.content.map(block => {
+        if (block.type === 'text') return block.text;
+        if (block.type === 'tool_use') return `[Tool use: ${block.name}]`;
+        if (block.type === 'tool_result') return `[Tool result for ${block.tool_use_id}]`;
+        if (block.type === 'image') return '[Image]';
+        return '[Content block]';
+      }).join('\n');
+    }
+    return `${role}: ${content}`;
+  }).join('\n\n');
+
+  const summaryPrompt = {
+    model,
+    max_tokens: 2000,
+    messages: [
+      {
+        role: 'user',
+        content: `You have been working on a task but have not yet completed it. Write a continuation summary that will allow you (or another instance of yourself) to resume work efficiently in a future context window where the conversation history will be replaced with this summary. Your summary should be structured, concise, and actionable. Include:
+
+1. Task Overview
+   - The user's core request and success criteria
+   - Any clarifications or constraints they specified
+
+2. Current State
+   - What has been completed so far
+   - Files created, modified, or analyzed (with paths if relevant)
+   - Key outputs or artifacts produced
+
+3. Important Discoveries
+   - Technical constraints or requirements uncovered
+   - Decisions made and their rationale
+   - Errors encountered and how they were resolved
+   - What approaches were tried that didn't work (and why)
+
+4. Next Steps
+   - Specific actions needed to complete the task
+   - Any blockers or open questions to resolve
+   - Priority order if multiple steps remain
+
+5. Context to Preserve
+   - User preferences or style requirements
+   - Domain-specific details that aren't obvious
+   - Any promises made to the user
+
+Be concise but complete—err on the side of including information that would prevent duplicate work or repeated mistakes. Write in a way that enables immediate resumption of the task.
+
+Wrap your summary in <summary></summary> tags.
+
+Conversation history:
+${conversationText}`,
+      },
+    ],
+  };
+
+  logger.info('compact', 'Requesting conversation summary', {
+    messageCount: messages.length,
+    endpoint,
+  });
+
+  try {
+    let summaryResponse;
+    if (endpoint === 'anthropic') {
+      const preparedRequest = prepareAnthropicRequest(summaryPrompt);
+      summaryResponse = await callAnthropicApi({ ...preparedRequest.request, stream: false });
+    } else if (endpoint === 'bigmodel') {
+      const glmRequest = await transformRequest(summaryPrompt);
+      summaryResponse = await callBigModelApi(glmRequest.request);
+    } else {
+      // OpenAI endpoint (default)
+      const glmRequest = await transformRequest(summaryPrompt);
+      summaryResponse = await callGLMApi(glmRequest.request);
+    }
+
+    // Extract summary text from response
+    let summaryText = '';
+    if (summaryResponse.content) {
+      const textBlock = summaryResponse.content.find(block => block.type === 'text');
+      if (textBlock) {
+        summaryText = textBlock.text;
+      }
+    } else if (summaryResponse.choices?.[0]?.message?.content) {
+      summaryText = summaryResponse.choices[0].message.content;
+    }
+
+    logger.info('compact', 'Conversation summary completed', {
+      summaryLength: summaryText.length,
+    });
+
+    return summaryText;
+  } catch (error) {
+    logger.error('compact', 'Failed to generate summary, using fallback', { error: error.message });
+    // Fallback: create a basic summary wrapper
+    return `<summary>Previous conversation contained ${messages.length} messages. Summary generation failed, but the conversation was compacted to continue.</summary>`;
+  }
+}
+
+/**
+ * Handle POST /v1/messages endpoint with auto-compact retry
  * @param {http.IncomingMessage} req - HTTP request
  * @param {http.ServerResponse} res - HTTP response
  */
@@ -430,105 +557,109 @@ async function handleMessages(req, res) {
   const startTime = Date.now();
   const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+  // Read and parse request body
+  const body = await readBody(req);
+  let anthropicRequest;
+
   try {
-    // Read and parse request body
-    const body = await readBody(req);
-    let anthropicRequest;
+    anthropicRequest = JSON.parse(body);
+  } catch (parseError) {
+    throw new InvalidRequestError('Invalid JSON in request body');
+  }
 
-    try {
-      anthropicRequest = JSON.parse(body);
-    } catch (parseError) {
-      throw new InvalidRequestError('Invalid JSON in request body');
-    }
-
-    // Broadcast request event
-    broadcastTrafficEvent({
-      id: requestId,
-      timestamp: new Date().toISOString(),
-      type: 'request',
-      data: {
-        method: 'POST',
-        path: '/v1/messages',
-        headers: {
-          'content-type': req.headers['content-type'],
-          'x-api-key': req.headers['x-api-key'] ? '[REDACTED]' : undefined,
-        },
-        body: anthropicRequest,
+  // Broadcast request event
+  broadcastTrafficEvent({
+    id: requestId,
+    timestamp: new Date().toISOString(),
+    type: 'request',
+    data: {
+      method: 'POST',
+      path: '/v1/messages',
+      headers: {
+        'content-type': req.headers['content-type'],
+        'x-api-key': req.headers['x-api-key'] ? '[REDACTED]' : undefined,
       },
-    });
+      body: anthropicRequest,
+    },
+  });
 
-    // Extract working directory from system prompt (Claude Code includes this)
-    const workingDir = extractWorkingDirectory(anthropicRequest.system);
-    if (workingDir) {
-      logger.debug('request', 'Working directory from system prompt', { workingDir });
-    }
+  // Extract working directory from system prompt (Claude Code includes this)
+  const workingDir = extractWorkingDirectory(anthropicRequest.system);
+  if (workingDir) {
+    logger.debug('request', 'Working directory from system prompt', { workingDir });
+  }
 
-    // Process messages for video file references (e.g., @video.mp4 or /path/to/video.mp4)
-    // This converts file path references to proper video content blocks
-    if (anthropicRequest.messages && Array.isArray(anthropicRequest.messages)) {
-      anthropicRequest.messages = await processMessagesForVideos(anthropicRequest.messages, workingDir);
-    }
+  // Process messages for video file references (e.g., @video.mp4 or /path/to/video.mp4)
+  // This converts file path references to proper video content blocks
+  if (anthropicRequest.messages && Array.isArray(anthropicRequest.messages)) {
+    anthropicRequest.messages = await processMessagesForVideos(anthropicRequest.messages, workingDir);
+  }
 
-    // Validate request structure
-    validateRequest(anthropicRequest);
+  // Validate request structure
+  validateRequest(anthropicRequest);
 
-    logger.request(req, anthropicRequest.messages?.length);
+  logger.request(req, anthropicRequest.messages?.length);
 
-    // Log message content for debugging
-    const messages = anthropicRequest.messages || [];
-    messages.forEach((msg, i) => {
-      const content = msg.content;
-      if (typeof content === 'string') {
-        logger.debug('request', `Message ${i} [${msg.role}]`, {
-          contentType: 'string',
-          preview: content.substring(0, 100)
-        });
-      } else if (Array.isArray(content)) {
-        const types = content.map(b => b.type);
-        logger.debug('request', `Message ${i} [${msg.role}]`, {
-          contentTypes: types,
-          blockCount: content.length
-        });
-      }
-    });
-
-    logger.debug('request', 'Request details', {
-      model: anthropicRequest.model,
-      hasClientTools: !!(anthropicRequest.tools?.length),
-      hasSystem: !!anthropicRequest.system,
-      stream: anthropicRequest.stream,
-      endpointMode: config.endpoint.mode,
-    });
-
-    // Log thinking parameter from client for debugging
-    if (anthropicRequest.thinking) {
-      logger.debug('request', 'Client sent thinking parameter (ignored)', {
-        thinkingType: anthropicRequest.thinking.type,
+  // Log message content for debugging
+  const messages = anthropicRequest.messages || [];
+  messages.forEach((msg, i) => {
+    const content = msg.content;
+    if (typeof content === 'string') {
+      logger.debug('request', `Message ${i} [${msg.role}]`, {
+        contentType: 'string',
+        preview: content.substring(0, 100)
+      });
+    } else if (Array.isArray(content)) {
+      const types = content.map(b => b.type);
+      logger.debug('request', `Message ${i} [${msg.role}]`, {
+        contentTypes: types,
+        blockCount: content.length
       });
     }
+  });
 
-    // Validate API key is configured
-    const validation = validateConfig();
-    if (!validation.isValid) {
-      logger.error('config', 'Configuration error', { errors: validation.errors });
-      throw new ProxyError(validation.errors.join('; '), 'api_error', 500);
-    }
+  logger.debug('request', 'Request details', {
+    model: anthropicRequest.model,
+    hasClientTools: !!(anthropicRequest.tools?.length),
+    hasSystem: !!anthropicRequest.system,
+    stream: anthropicRequest.stream,
+    endpointMode: config.endpoint.mode,
+  });
 
-    // Check which endpoint to use
-    // Vision requests (glm-4.6v) always use OpenAI path to avoid Z.ai's server_tool_use interception
-    // Only check the LAST message for images - previous images in history don't require vision model
-    const lastMessage = messages.length > 0 ? [messages[messages.length - 1]] : [];
-    const hasImagesInCurrentMessage = detectImages(lastMessage);
-
-    // Determine endpoint based on mode and vision
-    const endpoint = determineEndpoint(hasImagesInCurrentMessage);
-
-    logger.info('routing', 'Request routing', {
-      endpoint,
-      hasImages: hasImagesInCurrentMessage,
-      mode: config.endpoint.mode,
+  // Log thinking parameter from client for debugging
+  if (anthropicRequest.thinking) {
+    logger.debug('request', 'Client sent thinking parameter (ignored)', {
+      thinkingType: anthropicRequest.thinking.type,
     });
+  }
 
+  // Validate API key is configured
+  const validation = validateConfig();
+  if (!validation.isValid) {
+    logger.error('config', 'Configuration error', { errors: validation.errors });
+    throw new ProxyError(validation.errors.join('; '), 'api_error', 500);
+  }
+
+  // Check which endpoint to use
+  // Vision requests (glm-4.6v) always use OpenAI path to avoid Z.ai's server_tool_use interception
+  // Only check the LAST message for images - previous images in history don't require vision model
+  const lastMessage = messages.length > 0 ? [messages[messages.length - 1]] : [];
+  const hasImagesInCurrentMessage = detectImages(lastMessage);
+
+  // Determine endpoint based on mode and vision
+  const endpoint = determineEndpoint(hasImagesInCurrentMessage);
+
+  logger.info('routing', 'Request routing', {
+    endpoint,
+    hasImages: hasImagesInCurrentMessage,
+    mode: config.endpoint.mode,
+  });
+
+  // Try the request with auto-compact retry on context limit errors
+  // Only retry for non-streaming requests (streaming can't be retried mid-stream)
+  const wantsStreaming = isStreamingRequest(anthropicRequest);
+
+  try {
     if (endpoint === 'anthropic') {
       await handleAnthropicPath(res, anthropicRequest, startTime, requestId);
     } else if (endpoint === 'bigmodel') {
@@ -538,6 +669,58 @@ async function handleMessages(req, res) {
       await handleOpenAIPath(res, anthropicRequest, startTime, requestId);
     }
   } catch (error) {
+    // Auto-compact on context limit errors (only for non-streaming)
+    if (error instanceof ContextLimitError && !wantsStreaming && messages.length > 1) {
+      logger.info('compact', 'Auto-compact triggered by context limit error', {
+        messageCount: messages.length,
+        endpoint,
+      });
+
+      try {
+        // Generate summary of conversation
+        const summary = await summarizeConversation(messages, anthropicRequest.model, endpoint);
+
+        // Create compacted request with summary as assistant message
+        // This mimics the Anthropic SDK's client-side compaction approach
+        const compactedRequest = { ...anthropicRequest };
+
+        // Replace entire message history with a single assistant message containing the summary
+        compactedRequest.messages = [
+          {
+            role: 'assistant',
+            content: summary,
+          },
+        ];
+
+        logger.info('compact', 'Retrying request with compacted conversation', {
+          originalMessageCount: messages.length,
+          newMessageCount: compactedRequest.messages.length,
+          summaryLength: summary.length,
+        });
+
+        // Update the request for the next attempt
+        anthropicRequest = compactedRequest;
+
+        // Retry the request
+        if (endpoint === 'anthropic') {
+          await handleAnthropicPath(res, anthropicRequest, startTime, requestId);
+        } else if (endpoint === 'bigmodel') {
+          await handleBigModelPath(res, anthropicRequest, startTime, requestId);
+        } else {
+          await handleOpenAIPath(res, anthropicRequest, startTime, requestId);
+        }
+
+        logger.info('compact', 'Auto-compact retry successful');
+        return;
+      } catch (retryError) {
+        logger.error('compact', 'Auto-compact retry failed', {
+          error: retryError.message,
+        });
+        // Fall through to send the retry error
+        error = retryError;
+      }
+    }
+
     // Broadcast error event
     broadcastTrafficEvent({
       id: `${requestId}-error`,
@@ -793,6 +976,13 @@ async function callBigModelApi(glmRequest) {
       statusText: response.statusText,
       body: errorText.substring(0, 500),
     });
+
+    // Check if this is a context window limit error
+    const fullErrorMessage = `${response.status} ${response.statusText} ${errorText}`;
+    if (isContextLimitError(fullErrorMessage)) {
+      throw new ContextLimitError(`The model has reached its context window limit. Please compact the conversation to continue.`);
+    }
+
     throw new GlmApiError(
       `BigModel API error: ${response.status} ${response.statusText}`,
       response.status,
